@@ -1,6 +1,5 @@
 
 services:
-
   jobmanager:
     image: flink:latest
     networks:
@@ -46,8 +45,13 @@ services:
       KAFKA_BROKER: kafka:9092
       KAFKA_TOPIC: crypto-topic
       SINK_DIR: /sink
+      RETHINKDB_HOST: rethinkdb
+      RETHINKDB_PORT: 28015
+      RETHINKDB_DB: dbstream
+      RETHINKDB_TABLE: tbstream
     depends_on:
       - kafka
+      - rethinkdb
     volumes:
       - ./sink:/sink
     entrypoint:
@@ -85,75 +89,3 @@ networks:
   flink-net:
     external: false
     name: flink-net
-
-  # webserver:
-  #   image: apache/airflow:2.6.0-python3.9
-  #   command: webserver #If you get a permission error, use this as command: bash -c "chmod +x /opt/airflow/script/entrypoint.sh"
-  #   entrypoint: ['/opt/airflow/script/entrypoint.sh']
-  #   depends_on:
-  #     - postgres
-  #   environment:
-  #     - LOAD_EX=n
-  #     - EXECUTOR=Sequential
-  #     - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
-  #     - AIRFLOW_WEBSERVER_SECRET_KEY=this_is_a_very_secured_key
-  #   logging:
-  #     options:
-  #       max-size: 10m
-  #       max-file: "3"
-  #   volumes:
-  #     - ./dags:/opt/airflow/dags
-  #     - ./logs:/opt/airflow/logs
-  #     - ./config:/opt/airflow/config
-  #     - ./plugins:/opt/airflow/plugins
-  #     - ./script/entrypoint.sh:/opt/airflow/script/entrypoint.sh
-  #     - ./requirements.txt:/opt/airflow/requirements.txt
-  #   ports:
-  #     - "8080:8080"
-  #   healthcheck:
-  #     test: ['CMD-SHELL', "[ -f /opt/airflow/airflow-webserver.pid ]"]
-  #     interval: 30s
-  #     timeout: 30s
-  #     retries: 3
-  #   networks:
-  #     - flink-net
-  #
-  # scheduler:
-  #   image: apache/airflow:2.6.0-python3.9
-  #   depends_on:
-  #     webserver:
-  #       condition: service_healthy
-  #   volumes:
-  #     - ./dags:/opt/airflow/dags
-  #     - ./logs:/opt/airflow/logs
-  #     - ./config:/opt/airflow/config
-  #     - ./plugins:/opt/airflow/plugins
-  #     - ./script/entrypoint.sh:/opt/airflow/script/entrypoint.sh
-  #     - ./requirements.txt:/opt/airflow/requirements.txt
-  #   environment:
-  #     - LOAD_EX=n
-  #     - EXECUTOR=Sequential
-  #     - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
-  #     - AIRFLOW_WEBSERVER_SECRET_KEY=this_is_a_very_secured_key
-  #   command: bash -c "pip install -r ./requirements.txt && airflow db upgrade && airflow scheduler"
-  #   networks:
-  #     - flink-net
-
-  # postgres:
-  #   image: postgres:latest
-  #   container_name: dataflow1-postgres
-  #   # depends_on:
-  #   #   - zookeeper
-  #   ports:
-  #     - "5433:5432"
-  #   environment:
-  #     POSTGRES_USER : airflow
-  #     POSTGRES_PASSWORD : airflow
-  #     POSTGRES_DB : airflow
-  #   healthcheck:
-  #     test: ["CMD", "pg_isready -U $$POSTGRES_USER -d $$POSTGRES_DB"]
-  #     interval: 10s
-  #     timeout: 5s
-  #     retries: 5  
-  #   networks:
-  #     - flink-net

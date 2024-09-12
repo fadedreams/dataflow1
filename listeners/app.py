@@ -6,7 +6,20 @@ from pyflink.common.typeinfo import Types
 from pyflink.datastream import StreamExecutionEnvironment
 from pyflink.datastream.connectors import FileSink, RollingPolicy, OutputFileConfig
 from pyflink.datastream.connectors.kafka import KafkaOffsetsInitializer, KafkaSource
+import rethinkdb as r
 
+def get_rethinkdb_connection():
+    conn = r.connect(
+        host=os.environ.get("RETHINKDB_HOST", "localhost"),
+        port=int(os.environ.get("RETHINKDB_PORT", 28015))
+    )
+    return conn
+
+def create_rethinkdb_table(conn, db_name, table_name):
+    if db_name not in r.db_list().run(conn):
+        r.db_create(db_name).run(conn)
+    if table_name not in r.db(db_name).table_list().run(conn):
+        r.db(db_name).table_create(table_name).run(conn)
 
 def kafka_sink_example():
     """A Flink task which sinks a kafka topic to a file on disk
@@ -46,7 +59,6 @@ def kafka_sink_example():
     ds = ds.map(lambda a: a, output_type=Types.STRING())
 
     output_path = os.path.join(os.environ.get("SINK_DIR", "/sink"), "sink.log")
-
     # This is the sink that we will write to
     sink = (
         FileSink.for_row_format(
@@ -59,6 +71,18 @@ def kafka_sink_example():
 
     # Writing the processed stream to the file
     ds.sink_to(sink=sink)
+
+    # Define the RethinkDB sink
+    def rethinkdb_sink(elements):
+        conn = get_rethinkdb_connection()
+        db_name = os.environ.get("RETHINKDB_DB", "test")
+        table_name = os.environ.get("RETHINKDB_TABLE", "messages")
+        create_rethinkdb_table(conn, db_name, table_name)
+        for element in elements:
+            r.db(db_name).table(table_name).insert({"message": element}).run(conn)
+        conn.close()
+
+    ds.add_sink(rethinkdb_sink)
 
     # Execute the job and submit the job
     env.execute("kafka_sink_example")
