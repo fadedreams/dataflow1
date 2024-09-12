@@ -1,3 +1,4 @@
+
 services:
 
   jobmanager:
@@ -33,12 +34,11 @@ services:
       KAFKA_CREATE_TOPICS: "crypto-topic:1:1"
       KAFKA_ZOOKEEPER_CONNECT: zookeeper:2181
     ports:
-      - "9092:9092"  # Map port 9092 of Kafka container to port 9092 on localhost
+      - "9092:9092"
     networks:
       - flink-net
   
   app:
-    # /flink/bin/flink run -py /taskscripts/app.py --jobmanager jobmanager:8081 --target local
     image: flink-app
     build: 
       context: .
@@ -58,6 +58,33 @@ services:
     networks:
       - flink-net
 
+  cassandra_db:
+    image: cassandra:latest
+    container_name: cassandra
+    hostname: cassandra
+    ports:
+      - "9042:9042"
+    environment:
+      - max_heap_size=512m
+      - heap_newsize=100m
+      - cassandra_username=cassandra
+      - cassandra_password=cassandra
+    networks:
+      - flink-net
+
+  rethinkdb:
+    image: rethinkdb:latest
+    container_name: rethinkdb
+    ports:
+      - "28015:28015"   # RethinkDB client driver port
+      - "8080:8080"     # RethinkDB web interface
+    networks:
+      - flink-net
+
+networks:
+  flink-net:
+    external: false
+    name: flink-net
 
   # webserver:
   #   image: apache/airflow:2.6.0-python3.9
@@ -90,7 +117,7 @@ services:
   #     retries: 3
   #   networks:
   #     - flink-net
-
+  #
   # scheduler:
   #   image: apache/airflow:2.6.0-python3.9
   #   depends_on:
@@ -130,8 +157,3 @@ services:
   #     retries: 5  
   #   networks:
   #     - flink-net
-
-networks:
-  flink-net:
-    external: false
-    name: flink-net
