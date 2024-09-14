@@ -1,0 +1,96 @@
+import os
+from pyflink.common import WatermarkStrategy, Encoder
+from pyflink.common.serialization import SimpleStringSchema
+from pyflink.datastream import StreamExecutionEnvironment
+from pyflink.datastream.connectors import FileSink, RollingPolicy, OutputFileConfig
+from pyflink.datastream.connectors.kafka import KafkaOffsetsInitializer, KafkaSource
+from pyflink.datastream.functions import SinkFunction
+import rethinkdb as r
+
+
+def get_rethinkdb_connection():
+    """Establish a connection to RethinkDB."""
+    conn = r.connect(
+        host=os.environ.get("RETHINKDB_HOST", "localhost"),
+        port=int(os.environ.get("RETHINKDB_PORT", 28015))
+    )
+    return conn
+
+
+def create_rethinkdb_table(conn, db_name, table_name):
+    """Create a RethinkDB database and table if they do not exist."""
+    if db_name not in r.db_list().run(conn):
+        r.db_create(db_name).run(conn)
+    if table_name not in r.db(db_name).table_list().run(conn):
+        r.db(db_name).table_create(table_name).run(conn)
+
+
+class RethinkDBSink(SinkFunction):
+    """Custom Flink sink function to insert data into RethinkDB."""
+    def __init__(self, db_name, table_name):
+        self.db_name = db_name
+        self.table_name = table_name
+        self.conn = get_rethinkdb_connection()
+        create_rethinkdb_table(self.conn, self.db_name, self.table_name)
+
+    def invoke(self, value, context):
+        # Insert value into the specified RethinkDB table
+        r.db(self.db_name).table(self.table_name).insert({'value': value}).run(self.conn)
+
+
+def kafka_sink_example():
+    """A Flink task which sinks a Kafka topic to RethinkDB and a file on disk."""
+    # Create a StreamExecutionEnvironment
+    env = StreamExecutionEnvironment.get_execution_environment()
+
+    # Add Kafka SQL connector jar for integration
+    env.add_jars("file:///jars/flink-sql-connector-kafka-3.0.1-1.18.jar")
+
+    # Define the Kafka source
+    kafka_source = (
+        KafkaSource.builder()
+        .set_bootstrap_servers(os.environ["KAFKA_BROKER"])
+        .set_topics(os.environ["KAFKA_TOPIC"])
+        .set_group_id("flink_group")
+        .set_starting_offsets(KafkaOffsetsInitializer.earliest())
+        .set_value_only_deserializer(SimpleStringSchema())
+        .build()
+    )
+
+    # Create a data stream from the Kafka source
+    ds = env.from_source(
+        kafka_source, WatermarkStrategy.no_watermarks(), "Kafka Source"
+    )
+
+    # Map function to process the Kafka stream (e.g., count characters in message)
+    ds = ds.map(lambda a: a, output_type=Types.STRING())
+
+    # Define the path where data will be saved to a file
+    output_path = os.path.join(os.environ.get("SINK_DIR", "/sink"), "sink.log")
+
+    # Define a FileSink to write the processed stream to a file
+    file_sink = (
+        FileSink.for_row_format(
+            base_path=output_path, encoder=Encoder.simple_string_encoder()
+        )
+        .with_output_file_config(OutputFileConfig.builder().build())
+        .with_rolling_policy(RollingPolicy.default_rolling_policy())
+        .build()
+    )
+
+    # Add the file sink to the data stream
+    ds.sink_to(sink=file_sink)
+
+    # Define the custom RethinkDB sink
+    rethinkdb_sink = RethinkDBSink(db_name="test_db", table_name="kafka_messages")
+
+    # Add the custom RethinkDB sink to the data stream
+    ds.add_sink(rethinkdb_sink)
+
+    # Execute the Flink job
+    env.execute("kafka_sink_example")
+
+
+if __name__ == "__main__":
+    kafka_sink_example()
+

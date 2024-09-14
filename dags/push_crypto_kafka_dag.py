@@ -3,8 +3,8 @@ import websockets
 import json
 import logging
 from kafka import KafkaProducer
-from airflow import DAG
-from airflow.operators.python import PythonOperator
+# from airflow import DAG
+# from airflow.operators.python import PythonOperator
 from datetime import datetime
 
 # Set up Kafka Producer
@@ -43,10 +43,10 @@ async def fetch_data():
                 logging.error(f"An error occurred: {e}")
                 break
 
-default_args = {
-    'owner': 'airflow',
-    'start_date': datetime(2024, 1, 1, 10, 00),
-}
+# default_args = {
+#     'owner': 'airflow',
+#     'start_date': datetime(2024, 1, 1, 10, 00),
+# }
 
 def fetch_data_sync():
     loop = asyncio.get_event_loop()

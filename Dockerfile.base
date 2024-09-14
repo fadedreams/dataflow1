@@ -1,0 +1,38 @@
+# dockerfile.base
+
+# Use the Python 3.9 Bullseye image as the base
+FROM python:3.9.18-bullseye
+
+# Unset proxy-related environment variables
+ENV HTTP_PROXY="" \
+    HTTPS_PROXY="" \
+    http_proxy="" \
+    https_proxy="" \
+    NO_PROXY="" \
+    no_proxy="" \
+    all_proxy="" \
+    ALL_PROXY=""
+
+# Arguments for versions
+ARG FLINK_VER=1.18.1 \
+    POETRY_VER=1.6.1
+
+# Update system and install Java and other dependencies
+RUN apt update -y \
+    && apt-get install -y \
+       -o Debug::pkgAcquire::Progress=true \
+       --no-install-recommends \
+       openjdk-11-jdk=11.0.* \
+    && mkdir -p /taskscripts /jars /flink \
+    && wget -O /flink/flink.tgz https://dlcdn.apache.org/flink/flink-$FLINK_VER/flink-$FLINK_VER-bin-scala_2.12.tgz \
+    && tar -C /flink --strip-components 1 -zxvf /flink/flink.tgz \
+    && rm /flink/flink.tgz
+
+# Set Java home (if needed, adjust the path based on the architecture)
+ENV JAVA_HOME=/usr/lib/jvm/java-11-openjdk-amd64/
+
+COPY requirements.txt ./
+RUN pip install -r requirements.txt --progress-bar on
+
+# Add Flink SQL connector Kafka jar
+ADD https://repo.maven.apache.org/maven2/org/apache/flink/flink-sql-connector-kafka/3.0.1-1.18/flink-sql-connector-kafka-3.0.1-1.18.jar /jars
