@@ -12,8 +12,6 @@ RETHINKDB_PORT = int(os.environ['RETHINKDB_PORT'])
 RETHINKDB_DB = os.environ['RETHINKDB_DB']
 RETHINKDB_TABLE = os.environ['RETHINKDB_TABLE']
 
-
-
 def kafka_sink_example():
     """A Flink task which sinks a Kafka topic and prints the data."""
     # Create a StreamExecutionEnvironment
@@ -64,4 +62,5 @@ def kafka_sink_example():
 
 if __name__ == "__main__":
     kafka_sink_example()
+
 
