@@ -12,8 +12,10 @@ producer = KafkaProducer(
     bootstrap_servers=['broker:9092'],  # Adjust to your Kafka broker address
     # bootstrap_servers=['localhost:9092'],  # Adjust to your Kafka broker address
     max_block_ms=5000,
-    value_serializer=lambda v: json.dumps(v).encode('utf-8')  # Serialize JSON data
+    value_serializer=lambda v: json.dumps(
+        v).encode('utf-8')  # Serialize JSON data
 )
+
 
 async def fetch_data():
     url = "wss://ws.coinapi.io/v1/"
@@ -43,24 +45,23 @@ async def fetch_data():
                 logging.error(f"An error occurred: {e}")
                 break
 
-# default_args = {
-#     'owner': 'airflow',
-#     'start_date': datetime(2024, 1, 1, 10, 00),
-# }
+default_args = {
+    'owner': 'airflow',
+    'start_date': datetime(2024, 1, 1, 10, 00),
+}
 
-def fetch_data_sync():
-    loop = asyncio.get_event_loop()
-    loop.run_until_complete(fetch_data())
-
-fetch_data_sync()
-
-# with DAG('crypto_websocket_dag',
-#          default_args=default_args,
-#          schedule_interval='@daily',
-#          catchup=False) as dag:
+# def fetch_data_sync():
+#     loop = asyncio.get_event_loop()
+#     loop.run_until_complete(fetch_data())
 #
-#     streaming_task = PythonOperator(
-#         task_id='stream_data_from_websocket',
-#         python_callable=fetch_data_sync
-#     )
+# fetch_data_sync()
 
+with DAG('crypto_websocket_dag',
+         default_args=default_args,
+         schedule_interval='@daily',
+         catchup=False) as dag:
+
+    streaming_task = PythonOperator(
+        task_id='stream_data_from_websocket',
+        python_callable=fetch_data_sync
+    )
