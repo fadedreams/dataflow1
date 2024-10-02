@@ -1,5 +1,3 @@
-version: '3.8'
-
 services:
   jobmanager:
     image: flink:latest
@@ -102,68 +100,7 @@ services:
     depends_on:
       - zookeeper
 
-  data_processors:
-    image: python:3.9  # Use an appropriate base image with Python installed
-    container_name: data_processors
-    depends_on:
-      - kafka
-    volumes:
-      - ./listeners:/app/listeners  # Mount the directory with your Python scripts
-    working_dir: /app/listeners
-    command: >
-      bash -c "python app_hbase.py &
-                python app_cassandra.py &
-                python app_rethinkdb.py &
-                wait"
-    networks:
-      - flink-net
-
-  airflow:
-    image: apache/airflow:2.6.0-python3.9
-    command: webserver
-    entrypoint: ['/opt/airflow/script/entrypoint.sh']
-    depends_on:
-      - postgres
-    environment:
-      - LOAD_EX=n
-      - EXECUTOR=Sequential
-      - AIRFLOW__DATABASE__SQL_ALCHEMY_CONN=postgresql+psycopg2://airflow:airflow@postgres:5432/airflow
-      - AIRFLOW_WEBSERVER_SECRET_KEY=this_is_a_very_secured_key
-      - AIRFLOW__WEBSERVER__SECRET_KEY=this_is_a_very_secured_key
-    logging:
-      options:
-        max-size: 10m
-        max-file: "3"
-    volumes:
-      - ./dags:/opt/airflow/dags
-      - ./script/entrypoint.sh:/opt/airflow/script/entrypoint.sh
-      - ./requirements.txt:/opt/airflow/requirements.txt
-    ports:
-      - "8080:8080"
-    healthcheck:
-      test: ['CMD-SHELL', "[ -f /opt/airflow/airflow-webserver.pid ]"]
-      interval: 30s
-      timeout: 30s
-      retries: 3
-    networks:
-      - flink-net
-
-  postgres:
-    image: postgres:latest
-    environment:
-      POSTGRES_USER: airflow
-      POSTGRES_PASSWORD: airflow
-      POSTGRES_DB: airflow
-    networks:
-      - flink-net
-    volumes:
-      - postgres_data:/var/lib/postgresql/data
-
-volumes:
-  postgres_data:
-
 networks:
   flink-net:
     external: false
     name: flink-net
-
